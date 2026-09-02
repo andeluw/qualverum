@@ -28,14 +28,18 @@ struct QualverumApp: App {
         _chat = State(initialValue: ChatService(store: store))
 
         let defaults = UserDefaults.standard
-        let openLast = defaults.object(forKey: "openLastTender") as? Bool ?? true
+        let openLast =
+            defaults.object(forKey: "openLastTender") as? Bool ?? true
         let lastID = defaults.string(forKey: "lastTenderID").flatMap(UUID.init)
-        let activeID: UUID? = openLast
-            ? (store.tenders.first { $0.id == lastID }?.id ?? store.tenders.first?.id)
+        let activeID: UUID? =
+            openLast
+            ? (store.tenders.first { $0.id == lastID }?.id
+                ?? store.tenders.first?.id)
             : nil
         let state = AppState(activeTenderID: activeID)
         if let name = defaults.string(forKey: "defaultStartView"),
-           let start = SidebarItem(rawValue: name) {
+            let start = SidebarItem(rawValue: name)
+        {
             state.sidebarSelection = start
         }
         _appState = State(initialValue: state)
@@ -43,7 +47,7 @@ struct QualverumApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            appRoot
                 .environment(store)
                 .environment(workspace)
                 .environment(evidence)
@@ -53,7 +57,13 @@ struct QualverumApp: App {
                 .environment(appState)
                 .frame(minWidth: 1100, minHeight: 560)
         }
-        .commands { QualverumCommands(appState: appState, analysis: analysis, developerMode: $developerMode) }
+        .commands {
+            QualverumCommands(
+                appState: appState,
+                analysis: analysis,
+                developerMode: $developerMode
+            )
+        }
 
         Settings {
             SettingsView()
@@ -66,5 +76,22 @@ struct QualverumApp: App {
                 .environment(documents)
                 .frame(minWidth: 520, minHeight: 600)
         }
+    }
+
+    #if DEBUG
+        private let useDebugRoot = false
+    #endif
+
+    @ViewBuilder
+    private var appRoot: some View {
+        #if DEBUG
+            if useDebugRoot {
+                DebugRootView()
+            } else {
+                RootView()
+            }
+        #else
+            RootView()
+        #endif
     }
 }
