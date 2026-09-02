@@ -1,0 +1,122 @@
+# --------------------------------------------------
+# macOS metadata
+# --------------------------------------------------
+.DS_Store
+
+
+# --------------------------------------------------
+# Xcode user-specific files
+# Local UI state, breakpoints, and personal settings.
+# --------------------------------------------------
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+
+# --------------------------------------------------
+# Xcode build output
+# --------------------------------------------------
+build/
+DerivedData/
+
+
+# --------------------------------------------------
+# Swift Package Manager
+# --------------------------------------------------
+.build/
+.swiftpm/
+
+
+# --------------------------------------------------
+# Local workspace database
+# SQLite index/state is rebuildable from source docs; never commit it.
+# --------------------------------------------------
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+
+# --------------------------------------------------
+# Model weights
+# Downloaded separately, not tracked (see Models/README.md).
+# --------------------------------------------------
+Models/*
+!Models/README.md
+!Models/.gitkeep
+
+
+# --------------------------------------------------
+# App archives and debug symbols
+# --------------------------------------------------
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+
+# --------------------------------------------------
+# Swift Playgrounds
+# --------------------------------------------------
+timeline.xctimeline
+playground.xcworkspace
+
+
+# --------------------------------------------------
+# Python
+# Used by model conversion / Core ML tooling.
+# --------------------------------------------------
+__pycache__/
+*.py[cod]
+
+.venv/
+venv/
+.venv*/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+
+# --------------------------------------------------
+# Environment / secrets
+# --------------------------------------------------
+.env
+.env.*
+!.env.example
+
+
+# --------------------------------------------------
+# Core ML generated artifacts
+# Keep source .mlpackage / .mlmodel files unless
+# licensing or repository size requires otherwise.
+# --------------------------------------------------
+*.mlmodelc
+
+
+# --------------------------------------------------
+# Fastlane generated artifacts
+# --------------------------------------------------
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+
+# --------------------------------------------------
+# Editor / temporary files
+# --------------------------------------------------
+*.swp
+*~
+
+BuildArtifacts/
+
+
+# --------------------------------------------------
+# Local agent pointer files (not committed)
+# --------------------------------------------------
+CLAUDE.md
+AGENTS.md
