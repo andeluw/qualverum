@@ -17,7 +17,7 @@ struct TenderSelector: View {
         Menu {
             ForEach(workspace.tenders.filter { $0.status != .archived }) { tender in
                 Button {
-                    app.activeTenderID = tender.id
+                    app.selectTender(tender.id)
                 } label: {
                     if tender.id == app.activeTenderID {
                         Label(tender.name, systemImage: "checkmark")
@@ -29,6 +29,7 @@ struct TenderSelector: View {
             Divider()
             Button("All Tenders") { app.sidebarSelection = .allTenders }
             Button("New Tender…") { app.showNewTender = true }
+            Button("Import Tender…") { app.showImportTender = true }
         } label: {
             Label(active?.name ?? "No Tender", systemImage: "folder")
                 .labelStyle(.titleAndIcon)

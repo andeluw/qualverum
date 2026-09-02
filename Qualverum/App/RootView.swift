@@ -24,12 +24,16 @@ struct RootView: View {
         .searchable(text: $app.searchText, placement: .sidebar, prompt: "Search tenders and evidence")
         .searchSuggestions { GlobalSearchSuggestions() }
         .sheet(isPresented: $app.showNewTender) { NewTenderSheet() }
+        .sheet(isPresented: $app.showImportTender) { ImportTenderSheet() }
         .sheet(isPresented: $app.showAddEvidence) { AddEvidenceSheet() }
         .sheet(isPresented: $app.showAnalyze) { AnalyzeSheet() }
         .onChange(of: app.pendingDocument) { _, request in
             guard let request else { return }
             openWindow(id: "pdf", value: request)
             app.pendingDocument = nil
+        }
+        .onChange(of: app.activeTenderID) { _, id in
+            UserDefaults.standard.set(id?.uuidString, forKey: "lastTenderID")
         }
     }
 }
@@ -64,11 +68,15 @@ private struct DetailContainer: View {
         .toolbar {
             ToolbarItem(placement: .navigation) { TenderSelector() }
             ToolbarItemGroup {
-                Button { app.showAnalyze = true } label: {
-                    Label("Analyze Tender", systemImage: "play.circle")
+                if showsAnalyze {
+                    Button { app.showAnalyze = true } label: {
+                        Label("Analyze Tender", systemImage: "play.circle")
+                    }
+                    .help(currentTender?.documents.isEmpty == true
+                          ? "Add documents before analyzing"
+                          : "Analyze the current tender")
+                    .disabled(currentTender?.documents.isEmpty ?? true)
                 }
-                .help("Analyze the current tender")
-                .disabled(currentTender == nil)
 
                 if hasInspector {
                     Button { app.inspectorPresented.toggle() } label: {
@@ -84,9 +92,17 @@ private struct DetailContainer: View {
         workspace.store.tender(app.activeTenderID)
     }
 
+    // Only on tender-scoped surfaces.
+    private var showsAnalyze: Bool {
+        switch app.sidebarSelection ?? .overview {
+        case .overview, .requirements, .tenderDocuments, .analysisRuns, .ask: currentTender != nil
+        default: false
+        }
+    }
+
     private var hasInspector: Bool {
         switch app.sidebarSelection ?? .overview {
-        case .retrievalInspector, .experimentInspector: false
+        case .allTenders, .tenderDocuments, .retrievalInspector, .experimentInspector: false
         default: true
         }
     }

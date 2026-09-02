@@ -43,7 +43,7 @@ struct EvidenceInspector: View {
                         } else {
                             ForEach(tenders) { t in
                                 Button {
-                                    app.activeTenderID = t.id
+                                    app.selectTender(t.id)
                                     app.sidebarSelection = .overview
                                 } label: {
                                     Label(t.name, systemImage: "folder")
@@ -74,6 +74,7 @@ struct EvidenceInspector: View {
 struct AddEvidenceSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(EvidenceService.self) private var evidenceService
+    @Environment(AppState.self) private var app
 
     @State private var fileName = ""
     @State private var scope: EvidenceScope = .shared
@@ -103,7 +104,7 @@ struct AddEvidenceSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.pdf, .plainText]) { result in
+            .fileImporter(isPresented: $importing, allowedContentTypes: [.pdf]) { result in
                 if case .success(let url) = result {
                     fileName = url.lastPathComponent
                     if organization.isEmpty { organization = "Meridian Digital Ltd" }
@@ -124,7 +125,8 @@ struct AddEvidenceSheet: View {
     private func add() {
         let e = Evidence(name: (fileName as NSString).deletingPathExtension, type: type, scope: scope,
                          organization: organization, date: issued, expiry: hasExpiry ? expiry : nil,
-                         status: .valid, sourceFileName: fileName)
+                         status: .valid, sourceFileName: fileName,
+                         tenderID: scope == .tenderSpecific ? app.activeTenderID : nil)
         evidenceService.add(e)
         dismiss()
     }

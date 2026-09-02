@@ -54,11 +54,13 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     var selectedAnalysisRunID: UUID?
     var selectedChatThreadID: UUID?
     var selectedChunkID: UUID?
+    var selectedDocumentID: UUID?
 
     var inspectorPresented = true
     var searchText = ""
 
     var showNewTender = false
+    var showImportTender = false
     var showAddEvidence = false
     var showAnalyze = false
 
@@ -74,6 +76,19 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     func askAbout(scope: ChatScope, seed: String) {
         askPreset = (scope, seed)
         sidebarSelection = .ask
+    }
+
+    // Drop the old tender's selections; shared evidence selection stays.
+    func selectTender(_ id: UUID?) {
+        activeTenderID = id
+        selectedRequirementID = nil
+        selectedAnalysisRunID = nil
+        selectedChatThreadID = nil
+    }
+
+    func selectThread(_ thread: ChatThread) {
+        selectedChatThreadID = thread.id
+        if let tenderID = thread.tenderID { activeTenderID = tenderID }
     }
 }
 

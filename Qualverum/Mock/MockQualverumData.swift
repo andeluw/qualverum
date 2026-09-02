@@ -122,8 +122,8 @@ enum MockQualverumData {
             category: .financial, isMandatory: true,
             constraints: [.init(label: "Threshold", detail: "€10M / year"),
                           .init(label: "Period", detail: "Last 2 years")],
-            assessment: .init(status: .supported,
-                              rationale: "2024 turnover €24.6M exceeds threshold.",
+            assessment: .init(status: .needsReview,
+                              rationale: "2024 turnover €24.6M exceeds threshold, but the 2023 figure is not yet in evidence.",
                               evidenceIDs: ev(["Audited Financial Statements 2024"]),
                               validations: [.init(check: "Turnover ≥ €10M (2024)", outcome: "€24.6M", status: .supported),
                                             .init(check: "Turnover ≥ €10M (2023)", outcome: "Not in evidence", status: .needsReview)]),
@@ -166,7 +166,7 @@ enum MockQualverumData {
 
         list.append(Requirement(
             code: "R30", text: "Hold a current Cyber Essentials Plus certification.",
-            category: .security, isMandatory: false,
+            category: .security, isMandatory: true,
             constraints: [.init(label: "Assessment", detail: "Plus")],
             assessment: .init(status: .missing,
                               rationale: "Certification on file has expired.",
@@ -341,7 +341,7 @@ enum MockQualverumData {
                        messages: [
                         .init(role: .user, text: "Why are we not ready to submit?"),
                         .init(role: .assistant,
-                              text: "Three mandatory requirements are not yet Supported. R38 (EEA hosting) has no evidence, R30 (Cyber Essentials Plus) is expired, and R17 (reference projects) needs review. [1][2]",
+                              text: "Several mandatory requirements are not yet Supported, including R38 (EEA hosting) with no evidence, R30 (Cyber Essentials Plus) expired, and R17 (reference projects) needing review. [1][2]",
                               citations: [.init(index: 1, label: "Tender-Specification.pdf · p.44", evidenceID: nil, page: 44),
                                           .init(index: 2, label: "School-SIS-Case-Study.pdf · p.4", evidenceID: sisCase?.id, page: 4)]),
                        ]),

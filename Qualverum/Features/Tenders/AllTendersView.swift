@@ -10,19 +10,26 @@ import SwiftUI
 struct AllTendersView: View {
     @Environment(AppState.self) private var app
     @Environment(WorkspaceService.self) private var workspace
+    @Environment(AnalysisService.self) private var analysis
 
     @State private var sortOrder = [KeyPathComparator(\Tender.deadline)]
     @State private var selection: Tender.ID?
     @State private var filter = ""
+    @State private var showArchived = false
     @State private var pendingDeletion: Tender?
 
     private var rows: [Tender] {
         let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
         let base = workspace.tenders.filter {
-            q.isEmpty || $0.name.lowercased().contains(q) || $0.buyer.lowercased().contains(q)
-                || $0.reference.lowercased().contains(q)
+            (showArchived || $0.status != .archived) &&
+            (q.isEmpty || $0.name.lowercased().contains(q) || $0.buyer.lowercased().contains(q)
+                || $0.reference.lowercased().contains(q))
         }
         return base.sorted(using: sortOrder)
+    }
+
+    private func lastAnalysis(_ t: Tender) -> Date? {
+        analysis.runs(for: t.id).map(\.date).max()
     }
 
     var body: some View {
@@ -49,6 +56,10 @@ struct AllTendersView: View {
         }
         .navigationTitle("All Tenders")
         .toolbar {
+            ToolbarItem {
+                Toggle(isOn: $showArchived) { Label("Show Archived", systemImage: "archivebox") }
+                    .help("Show archived tenders")
+            }
             ToolbarItem { Button { app.showNewTender = true } label: { Label("New Tender", systemImage: "plus") } }
         }
         .confirmationDialog("Delete this tender?", isPresented: .init(
@@ -69,14 +80,22 @@ struct AllTendersView: View {
             TableColumn("Readiness") { t in
                 ReadinessGauge(value: t.readiness).frame(width: 90)
             }
+            TableColumn("Last Analysis") { t in
+                if let d = lastAnalysis(t) { Text(d.short) }
+                else { Text("—").foregroundStyle(.secondary) }
+            }
             TableColumn("Status") { TenderStatusLabel(status: $0.status) }
         }
         .contextMenu(forSelectionType: Tender.ID.self) { ids in
             if let id = ids.first, let t = workspace.store.tender(id) {
                 Button("Open") { open(t) }
-                Button("Analyze") { app.activeTenderID = t.id; app.showAnalyze = true }
+                Button("Analyze") { app.selectTender(t.id); app.showAnalyze = true }
                 Divider()
-                Button("Archive") { workspace.archive(t.id) }
+                if t.status == .archived {
+                    Button("Restore") { workspace.restore(t.id) }
+                } else {
+                    Button("Archive") { workspace.archive(t.id) }
+                }
                 Button("Delete…", role: .destructive) { pendingDeletion = t }
             }
         } primaryAction: { ids in
@@ -85,7 +104,7 @@ struct AllTendersView: View {
     }
 
     private func open(_ t: Tender) {
-        app.activeTenderID = t.id
+        app.selectTender(t.id)
         app.sidebarSelection = .overview
     }
 }

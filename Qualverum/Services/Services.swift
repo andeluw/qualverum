@@ -48,6 +48,10 @@ import Observation
         update(id) { $0.status = .archived }
     }
 
+    func restore(_ id: UUID) {
+        update(id) { $0.status = $0.requirements.isEmpty ? .notAnalyzed : .inReview }
+    }
+
     func delete(_ id: UUID) {
         store.tenders.removeAll { $0.id == id }
     }
@@ -139,11 +143,22 @@ import Observation
 
     private func finish(_ tender: Tender) {
         status = .completed
-        let result = (tender.supportedCount, tender.needsReviewCount, tender.missingCount)
+        var resolved = tender
+        // A freshly created tender has no requirements yet; the mock pipeline fills in a
+        // realistic extracted set so the New Tender flow actually lands on a matrix.
+        if resolved.requirements.isEmpty {
+            resolved.requirements = MockQualverumData.primaryRequirements(evidence: store.evidence)
+        }
+        if let i = store.tenders.firstIndex(where: { $0.id == resolved.id }) {
+            store.tenders[i].requirements = resolved.requirements
+            store.tenders[i].status = .inReview
+            store.tenders[i].modified = .now
+        }
+        let result = (resolved.supportedCount, resolved.needsReviewCount, resolved.missingCount)
         lastResult = result
         let run = AnalysisRun(
-            date: .now, tenderID: tender.id, tenderName: tender.name,
-            tenderVersion: tender.currentVersion,
+            date: .now, tenderID: resolved.id, tenderName: resolved.name,
+            tenderVersion: resolved.currentVersion,
             evidenceVersion: ISO8601DateFormatter().string(from: .now).prefix(10).description,
             configuration: .init(), supported: result.0, review: result.1, missing: result.2,
             duration: Double(total) * mockDelay, status: .completed)
@@ -178,6 +193,11 @@ import Observation
         store.threads[i].title = title
     }
 
+    func setScope(_ scope: ChatScope, for id: UUID) {
+        guard let i = index(id) else { return }
+        store.threads[i].scope = scope
+    }
+
     func delete(_ id: UUID) {
         store.threads.removeAll { $0.id == id }
     }
@@ -210,7 +230,7 @@ import Observation
         }
         if q.contains("missing") || q.contains("not ready") || q.contains("readiness") {
             return .init(role: .assistant,
-                         text: "Three mandatory requirements are not yet Supported: R38 (EEA hosting) has no evidence, R30 (Cyber Essentials Plus) is expired, and R17 (reference projects) needs review. [1]",
+                         text: "Several mandatory requirements are not yet Supported, including R38 (EEA hosting) with no evidence, R30 (Cyber Essentials Plus) expired, and R17 (reference projects) needing review. [1]",
                          citations: [.init(index: 1, label: "Tender-Specification.pdf · p.44", evidenceID: nil, page: 44)])
         }
         if q.contains("expire") {

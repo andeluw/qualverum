@@ -60,7 +60,7 @@ struct GlobalSearchSuggestions: View {
             if !documents.isEmpty {
                 Section("Tender Documents") {
                     ForEach(documents.prefix(5), id: \.1.id) { t, d in
-                        Button { openDocument(t) } label: { Label(d.name, systemImage: "doc.on.doc") }
+                        Button { openDocument(t, d) } label: { Label(d.name, systemImage: "doc.on.doc") }
                     }
                 }
             }
@@ -69,8 +69,13 @@ struct GlobalSearchSuggestions: View {
 
     private func clear() { app.searchText = "" }
 
-    private func openTender(_ t: Tender) { app.activeTenderID = t.id; app.sidebarSelection = .overview; clear() }
+    private func openTender(_ t: Tender) { app.selectTender(t.id); app.sidebarSelection = .overview; clear() }
     private func openRequirement(_ r: Requirement) { app.selectedRequirementID = r.id; app.sidebarSelection = .requirements; clear() }
     private func openEvidence(_ e: Evidence) { app.selectedEvidenceID = e.id; app.sidebarSelection = .companyEvidence; clear() }
-    private func openDocument(_ t: Tender) { app.activeTenderID = t.id; app.sidebarSelection = .tenderDocuments; clear() }
+    private func openDocument(_ t: Tender, _ d: TenderDocument) {
+        app.selectTender(t.id)
+        app.selectedDocumentID = d.id
+        app.sidebarSelection = .tenderDocuments
+        clear()
+    }
 }

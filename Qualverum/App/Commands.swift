@@ -16,7 +16,7 @@ struct QualverumCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("New Tender…") { appState.showNewTender = true }
                 .keyboardShortcut("n", modifiers: [.command])
-            Button("Import Tender…") { appState.showNewTender = true }
+            Button("Import Tender…") { appState.showImportTender = true }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
             Button("Add Evidence…") { appState.showAddEvidence = true }
                 .keyboardShortcut("e", modifiers: [.command, .shift])

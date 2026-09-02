@@ -30,6 +30,9 @@ struct AskView: View {
             .toolbar { historyMenu }
             .onAppear(perform: applyPreset)
             .onChange(of: app.askPreset?.seed) { applyPreset() }
+            .onChange(of: scope) { _, newScope in
+                if let thread { chat.setScope(newScope, for: thread.id) }
+            }
             .alert("Rename Chat", isPresented: .init(
                 get: { renaming != nil }, set: { if !$0 { renaming = nil } }
             )) {
@@ -56,7 +59,8 @@ struct AskView: View {
                     Section("History") {
                         ForEach(chat.threads) { t in
                             Button {
-                                app.selectedChatThreadID = t.id
+                                app.selectThread(t)
+                                scope = t.scope
                             } label: {
                                 Label(t.title, systemImage: t.id == thread?.id ? "checkmark" : t.scope.symbol)
                             }

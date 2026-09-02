@@ -12,13 +12,14 @@ struct AnalysisRunsView: View {
     @Environment(AnalysisService.self) private var analysis
 
     @State private var sortOrder = [KeyPathComparator(\AnalysisRun.date, order: .reverse)]
+    @State private var selection: Set<AnalysisRun.ID> = []
+    @State private var comparing: RunComparison?
 
     private var rows: [AnalysisRun] {
         analysis.runs(for: app.activeTenderID).sorted(using: sortOrder)
     }
 
     var body: some View {
-        @Bindable var app = app
         Group {
             if app.activeTenderID == nil {
                 ContentUnavailableView("No Tender Selected", systemImage: "clock.arrow.circlepath",
@@ -32,7 +33,7 @@ struct AnalysisRunsView: View {
                     Button("Analyze Tender") { app.showAnalyze = true }
                 }
             } else {
-                Table(rows, selection: $app.selectedAnalysisRunID, sortOrder: $sortOrder) {
+                Table(rows, selection: $selection, sortOrder: $sortOrder) {
                     TableColumn("Date", value: \.date) { Text($0.date.short) }
                     TableColumn("Tender Version", value: \.tenderVersion)
                     TableColumn("Evidence Version", value: \.evidenceVersion)
@@ -44,6 +45,23 @@ struct AnalysisRunsView: View {
             }
         }
         .navigationTitle("Analysis History")
+        .toolbar {
+            ToolbarItem {
+                Button { compareSelected() } label: { Label("Compare", systemImage: "arrow.left.arrow.right") }
+                    .help("Compare two selected runs")
+                    .disabled(selection.count != 2)
+            }
+        }
+        .onChange(of: selection) { _, sel in
+            app.selectedAnalysisRunID = sel.count == 1 ? sel.first : nil
+        }
+        .sheet(item: $comparing) { CompareRunsSheet(a: $0.a, b: $0.b) }
+    }
+
+    private func compareSelected() {
+        let picked = rows.filter { selection.contains($0.id) }.sorted { $0.date < $1.date }
+        guard picked.count == 2 else { return }
+        comparing = RunComparison(a: picked[0], b: picked[1])
     }
 
     private func resultChips(_ run: AnalysisRun) -> some View {
@@ -61,6 +79,72 @@ struct AnalysisRunsView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(n)")
+    }
+}
+
+struct RunComparison: Identifiable {
+    let id = UUID()
+    let a: AnalysisRun   // earlier
+    let b: AnalysisRun   // later
+}
+
+struct CompareRunsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let a: AnalysisRun
+    let b: AnalysisRun
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Compare Analyses").font(.title2.bold())
+                Spacer()
+            }
+            .padding(20)
+            Divider()
+            Form {
+                Section {
+                    LabeledContent("Earlier", value: a.date.short)
+                    LabeledContent("Later", value: b.date.short)
+                    LabeledContent("Tender Version", value: versions)
+                }
+                Section("Results") {
+                    deltaRow("Supported", a.supported, b.supported)
+                    deltaRow("Needs Review", a.review, b.review)
+                    deltaRow("Missing", a.missing, b.missing)
+                }
+                Section("Run") {
+                    deltaRow("Duration (s)", Int(a.duration), Int(b.duration))
+                    LabeledContent("Status", value: "\(a.status.rawValue) → \(b.status.rawValue)")
+                }
+            }
+            .formStyle(.grouped)
+            Divider()
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+            .padding()
+        }
+        .frame(width: 460, height: 460)
+    }
+
+    private var versions: String {
+        a.tenderVersion == b.tenderVersion ? a.tenderVersion : "\(a.tenderVersion) → \(b.tenderVersion)"
+    }
+
+    private func deltaRow(_ label: String, _ x: Int, _ y: Int) -> some View {
+        LabeledContent(label) {
+            HStack(spacing: 8) {
+                Text("\(x) → \(y)").monospacedDigit()
+                delta(y - x)
+            }
+        }
+    }
+
+    private func delta(_ d: Int) -> some View {
+        Text(d == 0 ? "±0" : d > 0 ? "+\(d)" : "\(d)")
+            .font(.caption.weight(.medium)).monospacedDigit()
+            .foregroundStyle(.secondary)
     }
 }
 

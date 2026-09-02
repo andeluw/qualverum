@@ -26,7 +26,19 @@ struct QualverumApp: App {
         _evidence = State(initialValue: EvidenceService(store: store))
         _analysis = State(initialValue: AnalysisService(store: store))
         _chat = State(initialValue: ChatService(store: store))
-        _appState = State(initialValue: AppState(activeTenderID: store.tenders.first?.id))
+
+        let defaults = UserDefaults.standard
+        let openLast = defaults.object(forKey: "openLastTender") as? Bool ?? true
+        let lastID = defaults.string(forKey: "lastTenderID").flatMap(UUID.init)
+        let activeID: UUID? = openLast
+            ? (store.tenders.first { $0.id == lastID }?.id ?? store.tenders.first?.id)
+            : nil
+        let state = AppState(activeTenderID: activeID)
+        if let name = defaults.string(forKey: "defaultStartView"),
+           let start = SidebarItem(rawValue: name) {
+            state.sidebarSelection = start
+        }
+        _appState = State(initialValue: state)
     }
 
     var body: some Scene {

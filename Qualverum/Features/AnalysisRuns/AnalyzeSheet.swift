@@ -12,6 +12,7 @@ struct AnalyzeSheet: View {
     @Environment(AppState.self) private var app
     @Environment(WorkspaceService.self) private var workspace
     @Environment(AnalysisService.self) private var analysis
+    @AppStorage("showResultsOnFinish") private var showResultsOnFinish = true
 
     private var tender: Tender? { workspace.store.tender(app.activeTenderID) }
 
@@ -27,6 +28,12 @@ struct AnalyzeSheet: View {
         }
         .padding(20)
         .frame(width: 420, height: 380)
+        .onChange(of: analysis.status) { _, status in
+            if status == .completed && !showResultsOnFinish {
+                app.sidebarSelection = .requirements
+                dismiss()
+            }
+        }
         .onDisappear { if analysis.status != .running { analysis.reset() } }
     }
 
@@ -37,13 +44,18 @@ struct AnalyzeSheet: View {
                 Text(tender.name).foregroundStyle(.secondary)
                 LabeledContent("Requirements", value: "\(tender.requirementCount)")
                 LabeledContent("Documents", value: "\(tender.documents.count)")
+                if tender.documents.isEmpty {
+                    Label("Add documents to this tender before analyzing.", systemImage: "exclamationmark.triangle")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Analyze") { if let tender { analysis.analyze(tender) } }
-                    .keyboardShortcut(.defaultAction).disabled(tender == nil)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(tender?.documents.isEmpty ?? true)
             }
         }
     }

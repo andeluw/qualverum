@@ -76,7 +76,7 @@ struct EvidenceView: View {
                     app.askAbout(scope: .selectedEvidence, seed: "What does \(e.name) establish?")
                 }
                 Button("Reveal in Finder") { revealInFinder() }
-                Button("Edit Metadata…") { app.selectedEvidenceID = e.id }
+                Button("Show Details") { app.selectedEvidenceID = e.id; app.inspectorPresented = true }
                 Divider()
                 Button("Remove…", role: .destructive) {
                     if confirmRemove { pendingRemoval = e } else { evidenceService.remove(e.id) }

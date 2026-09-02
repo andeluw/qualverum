@@ -11,6 +11,7 @@ struct OverviewView: View {
     @Environment(AppState.self) private var app
     @Environment(WorkspaceService.self) private var workspace
     @Environment(AnalysisService.self) private var analysis
+    @AppStorage("showStatusCounts") private var showStatusCounts = true
 
     private var tender: Tender? { workspace.store.tender(app.activeTenderID) }
 
@@ -77,11 +78,13 @@ struct OverviewView: View {
         GroupBox {
             HStack(spacing: 32) {
                 ReadinessGauge(value: t.readiness).frame(maxWidth: 240)
-                Divider().frame(height: 44)
-                countTile("\(t.requirementCount)", "Requirements", .secondary)
-                countTile("\(t.supportedCount)", "Supported", .green)
-                countTile("\(t.needsReviewCount)", "Needs Review", .orange)
-                countTile("\(t.missingCount)", "Missing", .red)
+                if showStatusCounts {
+                    Divider().frame(height: 44)
+                    countTile("\(t.requirementCount)", "Requirements", .secondary)
+                    countTile("\(t.supportedCount)", "Supported", .green)
+                    countTile("\(t.needsReviewCount)", "Needs Review", .orange)
+                    countTile("\(t.missingCount)", "Missing", .red)
+                }
                 Spacer()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -180,17 +183,19 @@ struct OverviewView: View {
 
     private func runCounts(_ run: AnalysisRun) -> some View {
         HStack(spacing: 12) {
-            countChip(run.supported, .green, "checkmark.circle.fill")
-            countChip(run.review, .orange, "questionmark.circle.fill")
-            countChip(run.missing, .red, "xmark.circle.fill")
+            countChip(run.supported, .green, "checkmark.circle.fill", "Supported")
+            countChip(run.review, .orange, "questionmark.circle.fill", "Needs Review")
+            countChip(run.missing, .red, "xmark.circle.fill", "Missing")
         }
     }
 
-    private func countChip(_ n: Int, _ color: Color, _ symbol: String) -> some View {
+    private func countChip(_ n: Int, _ color: Color, _ symbol: String, _ label: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: symbol).foregroundStyle(color)
             Text("\(n)").monospacedDigit()
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label): \(n)")
     }
 }
 
@@ -210,11 +215,28 @@ struct OverviewInspector: View {
                         LabeledContent("Status") { TenderStatusLabel(status: t.status) }
                         LabeledContent("Version", value: t.currentVersion)
                     }
+                    if !t.notes.isEmpty {
+                        Section("Notes") { Text(t.notes).foregroundStyle(.secondary) }
+                    }
+                    Section("Version History") {
+                        ForEach(t.versions) { v in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(v.label).fontWeight(.medium)
+                                    Spacer()
+                                    Text(v.date.short).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Text(v.change).font(.callout).foregroundStyle(.secondary)
+                                Text("\(v.documentCount) documents").font(.caption).foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
                     Section("Actions") {
                         Button("Ask About Readiness") {
                             app.askAbout(scope: .currentTender, seed: "Why are we not ready to submit?")
                         }
                         Button("Analyze Tender") { app.showAnalyze = true }
+                            .disabled(t.documents.isEmpty)
                     }
                 }
                 .formStyle(.grouped)

@@ -49,13 +49,13 @@ private struct GeneralSettings: View {
 private struct ModelsSettings: View {
     var body: some View {
         Form {
-            Section("Active Models") {
-                LabeledContent("Embedding", value: "Qwen3-Embedding-0.6B")
-                LabeledContent("Alternative", value: "EmbeddingGemma 300M")
-                LabeledContent("Reranker", value: "Qwen3-Reranker-0.6B")
+            Section("Planned Retrieval Configuration") {
+                LabeledContent("Candidate Embedding", value: "Qwen3-Embedding-0.6B")
+                LabeledContent("Alternative Embedding", value: "EmbeddingGemma 300M")
+                LabeledContent("Candidate Reranker", value: "Qwen3-Reranker-0.6B")
                 LabeledContent("Generator", value: "Apple Foundation Models")
             }
-            Section { Text("Model download integration is not available yet.").foregroundStyle(.secondary) }
+            Section { Text("No model is loaded yet. These are candidates to benchmark, not active models.").foregroundStyle(.secondary) }
         }
         .formStyle(.grouped)
     }

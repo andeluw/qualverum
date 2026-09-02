@@ -67,4 +67,5 @@ struct Evidence: Identifiable, Codable, Hashable {
     var sourceFileName: String
     var sampleResource: String?
     var page: Int = 1
+    var tenderID: UUID?   // owning tender when scope is tenderSpecific
 }

@@ -77,6 +77,13 @@ struct RequirementInspector: View {
                         Button("Ask About Requirement") {
                             app.askAbout(scope: .selectedRequirement, seed: "Why is \(r.code) \(r.status.rawValue)?")
                         }
+                        if r.status == .needsReview || r.status == .missing {
+                            Button("Find Better Evidence") {
+                                app.askAbout(scope: .selectedRequirement,
+                                             seed: "What evidence would satisfy \(r.code)?")
+                            }
+                            Button("Add Evidence…") { app.showAddEvidence = true }
+                        }
                     }
                 }
                 .formStyle(.grouped)

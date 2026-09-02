@@ -79,7 +79,7 @@ struct NewTenderSheet: View {
             versions: [.init(label: "1.0", date: .now, change: "Initial", documentCount: docs.count)],
             documents: docs, requirements: [])
         workspace.addTender(tender)
-        app.activeTenderID = tender.id
+        app.selectTender(tender.id)
         app.sidebarSelection = .overview
         dismiss()
     }
