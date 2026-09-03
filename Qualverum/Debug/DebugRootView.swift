@@ -7,12 +7,13 @@
 
 #if DEBUG
 
-import SwiftUI
+    import SwiftUI
 
-struct DebugRootView: View {
-    var body: some View {
-        DocumentPipelineDebugView()
+    struct DebugRootView: View {
+        var body: some View {
+            //            DocumentPipelineDebugView()
+            EmbeddingDebugView()
+        }
     }
-}
 
 #endif
