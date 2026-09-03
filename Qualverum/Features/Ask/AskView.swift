@@ -112,9 +112,9 @@ struct AskView: View {
             .pickerStyle(.menu)
             .fixedSize()
             Spacer()
-            if chat.pendingThreadID != nil {
+            if chat.pendingThreadID == thread?.id {
                 ProgressView().controlSize(.small)
-                Text("Retrieving…").foregroundStyle(.secondary).font(.callout)
+                Text("Answering…").foregroundStyle(.secondary).font(.callout)
             }
         }
         .padding(.horizontal, 16)
@@ -152,7 +152,10 @@ struct AskView: View {
         }
     }
 
-    private var canSend: Bool { !draft.trimmingCharacters(in: .whitespaces).isEmpty }
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespaces).isEmpty
+            && chat.pendingThreadID != thread?.id
+    }
 
     private var composer: some View {
         ChatInputField(text: $draft, height: $inputHeight,
@@ -212,12 +215,12 @@ struct AskView: View {
     }
 
     static let suggested = [
-        "Why are we not ready to submit?",
-        "Show missing mandatory requirements.",
-        "Which evidence expires before submission?",
-        "What supports our financial qualification?",
-        "Why is R17 Needs Review?",
-        "Which requirements have weak evidence?",
+        "What is the contract duration?",
+        "What are the eligibility requirements?",
+        "What documents must the bidder submit?",
+        "What is the submission deadline?",
+        "What are the technical requirements?",
+        "Are there any mandatory certifications?",
     ]
 }
 

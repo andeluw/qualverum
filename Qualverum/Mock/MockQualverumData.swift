@@ -252,9 +252,9 @@ enum MockQualverumData {
             ],
             documents: [
                 .init(name: "Tender-Specification.pdf", type: "Specification", pages: 64,
-                      version: "1.2", imported: date(2026, 8, 20), state: .indexed, sampleResource: nil),
+                      version: "1.2", imported: date(2026, 8, 20), state: .imported, sampleResource: nil),
                 .init(name: "Security-Annex.pdf", type: "Annex", pages: 18,
-                      version: "1.1", imported: date(2026, 7, 30), state: .indexed, sampleResource: nil),
+                      version: "1.1", imported: date(2026, 7, 30), state: .imported, sampleResource: nil),
                 .init(name: "Pricing-Schedule.pdf", type: "Schedule", pages: 6,
                       version: "1.0", imported: date(2026, 7, 1), state: .parsed, sampleResource: nil),
                 .init(name: "Addendum-2.pdf", type: "Addendum", pages: 3,
@@ -288,7 +288,7 @@ enum MockQualverumData {
             versions: [.init(label: "2.0", date: date(2026, 7, 15), change: "Final tender", documentCount: 1)],
             documents: [
                 .init(name: "ERP-Tender.pdf", type: "Specification", pages: 88,
-                      version: "2.0", imported: date(2026, 7, 15), state: .indexed, sampleResource: nil),
+                      version: "2.0", imported: date(2026, 7, 15), state: .imported, sampleResource: nil),
             ],
             requirements: Array(primaryReqs.prefix(6)))
 

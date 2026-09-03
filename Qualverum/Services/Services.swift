@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import RAGCore
 
 // Fake data kept in memory.
 @Observable final class WorkspaceStore {
@@ -174,17 +175,40 @@ import Observation
     }
 }
 
-@Observable final class ChatService {
+@MainActor
+@Observable
+final class ChatService {
     let store: WorkspaceStore
-    init(store: WorkspaceStore) { self.store = store }
+
+    private let rag: RAGService
 
     private(set) var pendingThreadID: UUID?
 
-    var threads: [ChatThread] { store.threads }
+    init(
+        store: WorkspaceStore,
+        rag: RAGService
+    ) {
+        self.store = store
+        self.rag = rag
+    }
 
-    func newThread(scope: ChatScope, tenderID: UUID?) -> ChatThread {
-        let thread = ChatThread(title: "New Chat", scope: scope, tenderID: tenderID, messages: [])
+    var threads: [ChatThread] {
+        store.threads
+    }
+
+    func newThread(
+        scope: ChatScope,
+        tenderID: UUID?
+    ) -> ChatThread {
+        let thread = ChatThread(
+            title: "New Chat",
+            scope: scope,
+            tenderID: tenderID,
+            messages: []
+        )
+
         store.threads.insert(thread, at: 0)
+
         return thread
     }
 
@@ -204,49 +228,184 @@ import Observation
 
     func send(_ text: String, to threadID: UUID) {
         guard let i = index(threadID) else { return }
-        store.threads[i].messages.append(.init(role: .user, text: text))
+
+        store.threads[i].messages.append(
+            ChatMessage(role: .user, text: text)
+        )
+
         if store.threads[i].title == "New Chat" {
             store.threads[i].title = String(text.prefix(40))
         }
+
+        let scope = store.threads[i].scope
+        let tenderID = store.threads[i].tenderID
+
+        // App keeps the full history; only the most recent
+        // turns are offered to the model call.
+        let history =
+            store.threads[i].messages
+            .dropLast()
+            .suffix(4)
+            .map { message in
+                RAGConversationTurn(
+                    role: message.role == .user ? .user : .assistant,
+                    text: message.text
+                )
+            }
+
         pendingThreadID = threadID
+
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(0.6))
-            let reply = Self.cannedAnswer(for: text)
-            if let j = index(threadID) { store.threads[j].messages.append(reply) }
-            pendingThreadID = nil
+            defer {
+                if pendingThreadID == threadID {
+                    pendingThreadID = nil
+                }
+            }
+
+            guard scope == .currentTender else {
+                append(
+                    ChatMessage(
+                        role: .assistant,
+                        text: "This scope is not indexed yet. Use Current Tender for document-grounded questions in this build."
+                    ),
+                    to: threadID
+                )
+
+                return
+            }
+
+            guard let tenderID else {
+                append(
+                    ChatMessage(
+                        role: .assistant,
+                        text: "Select a tender before asking a document-grounded question.",
+                        kind: .insufficientEvidence
+                    ),
+                    to: threadID
+                )
+
+                return
+            }
+
+            do {
+                let answer = try await rag.answer(
+                    question: text,
+                    tenderID: tenderID,
+                    history: Array(history)
+                )
+
+                if answer.isInsufficient {
+                    append(
+                        ChatMessage(
+                            role: .assistant,
+                            text: "I can't establish this from the indexed tender documents.",
+                            kind: .insufficientEvidence
+                        ),
+                        to: threadID
+                    )
+
+                    return
+                }
+
+                append(
+                    ChatMessage(
+                        role: .assistant,
+                        text: answer.text,
+                        citations: Self.citations(from: answer.evidence)
+                    ),
+                    to: threadID
+                )
+
+            } catch GenerationProviderError.unavailable(let reason) {
+                append(
+                    ChatMessage(
+                        role: .assistant,
+                        text: Self.unavailableMessage(for: reason)
+                    ),
+                    to: threadID
+                )
+
+            } catch GenerationProviderError.contextTooLarge {
+                append(
+                    ChatMessage(
+                        role: .assistant,
+                        text: "The retrieved context is too large for the on-device model. Try a more specific question."
+                    ),
+                    to: threadID
+                )
+
+            } catch RAGServiceError.noIndexForTender {
+                append(
+                    ChatMessage(
+                        role: .assistant,
+                        text: "This tender has no indexed documents yet. Add a PDF in Tender Documents first.",
+                        kind: .insufficientEvidence
+                    ),
+                    to: threadID
+                )
+
+            } catch RAGServiceError.noRetrievalResults {
+                append(
+                    ChatMessage(
+                        role: .assistant,
+                        text: "I couldn't find relevant evidence in the indexed tender documents.",
+                        kind: .insufficientEvidence
+                    ),
+                    to: threadID
+                )
+
+            } catch {
+                append(
+                    ChatMessage(
+                        role: .assistant,
+                        text: "I couldn't answer this question.\n\n\(error.localizedDescription)"
+                    ),
+                    to: threadID
+                )
+            }
         }
     }
 
-    private func index(_ id: UUID) -> Int? { store.threads.firstIndex { $0.id == id } }
+    private func append(_ message: ChatMessage, to threadID: UUID) {
+        guard let i = index(threadID) else { return }
+        store.threads[i].messages.append(message)
+    }
 
-    // If nothing matches, say so instead of guessing.
-    static func cannedAnswer(for question: String) -> ChatMessage {
-        let q = question.lowercased()
-        if q.contains("r17") || q.contains("project") {
-            return .init(role: .assistant,
-                         text: "The tender requires two comparable projects completed within the previous three years.\n\nProject Alpha qualifies. [1]\n\nProject Beta is recent enough, but the current evidence does not establish sufficient similarity. [2]\n\nResult: Needs Review.",
-                         citations: [.init(index: 1, label: "School-SIS-Case-Study.pdf · p.4", evidenceID: nil, page: 4),
-                                     .init(index: 2, label: "Municipal-ERP.pdf · p.7", evidenceID: nil, page: 7)])
+    private func index(_ id: UUID) -> Int? {
+        store.threads.firstIndex { $0.id == id }
+    }
+
+    private static func citations(
+        from results: [RetrievalResult]
+    ) -> [ChatCitation] {
+        results.enumerated().map { index, result in
+            let chunk = result.chunk
+
+            return ChatCitation(
+                index: index + 1,
+                label: "\(chunk.documentID) · p.\(chunk.pageNumber)",
+                evidenceID: nil,
+                page: chunk.pageNumber
+            )
         }
-        if q.contains("missing") || q.contains("not ready") || q.contains("readiness") {
-            return .init(role: .assistant,
-                         text: "Several mandatory requirements are not yet Supported, including R38 (EEA hosting) with no evidence, R30 (Cyber Essentials Plus) expired, and R17 (reference projects) needing review. [1]",
-                         citations: [.init(index: 1, label: "Tender-Specification.pdf · p.44", evidenceID: nil, page: 44)])
+    }
+
+    private static func unavailableMessage(
+        for reason: GenerationUnavailableReason
+    ) -> String {
+        switch reason {
+        case .appleIntelligenceNotEnabled:
+            return "Ask Qualverum requires Apple Intelligence. Turn on Apple Intelligence and try again."
+
+        case .deviceNotEligible:
+            return "The on-device Foundation Model isn't supported on this Mac."
+
+        case .modelNotReady:
+            return "The on-device Foundation Model isn't ready yet. It may still be downloading."
+
+        case .unknown:
+            return "The on-device Foundation Model is currently unavailable."
         }
-        if q.contains("expire") {
-            return .init(role: .assistant,
-                         text: "Professional Indemnity Insurance expires 2025-12-31 and ISO 9001 expires 2026-10-30. [1][2]",
-                         citations: [.init(index: 1, label: "PI-Insurance.pdf · p.1", evidenceID: nil, page: 1),
-                                     .init(index: 2, label: "ISO-9001-Certificate.pdf · p.1", evidenceID: nil, page: 1)])
-        }
-        if q.contains("financ") || q.contains("turnover") {
-            return .init(role: .assistant,
-                         text: "The 2024 audited statements show €24.6M turnover, above the €10M threshold. Prior-year turnover is not yet in evidence. [1]",
-                         citations: [.init(index: 1, label: "Financials-2024.pdf · p.2", evidenceID: nil, page: 2)])
-        }
-        return .init(role: .assistant,
-                     text: "I can't establish this from the current evidence. No indexed evidence answers this question yet, add supporting documents or narrow the scope.",
-                     kind: .insufficientEvidence)
     }
 }
 

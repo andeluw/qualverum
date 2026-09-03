@@ -13,6 +13,7 @@ struct QualverumApp: App {
     @State private var workspace: WorkspaceService
     @State private var evidence: EvidenceService
     @State private var analysis: AnalysisService
+    @State private var rag: RAGService
     @State private var chat: ChatService
     @State private var documents = DocumentService()
     @State private var appState: AppState
@@ -25,7 +26,9 @@ struct QualverumApp: App {
         _workspace = State(initialValue: WorkspaceService(store: store))
         _evidence = State(initialValue: EvidenceService(store: store))
         _analysis = State(initialValue: AnalysisService(store: store))
-        _chat = State(initialValue: ChatService(store: store))
+        let rag = RAGService()
+        _rag = State(initialValue: rag)
+        _chat = State(initialValue: ChatService(store: store, rag: rag))
 
         let defaults = UserDefaults.standard
         let openLast =
@@ -52,6 +55,7 @@ struct QualverumApp: App {
                 .environment(workspace)
                 .environment(evidence)
                 .environment(analysis)
+                .environment(rag)
                 .environment(chat)
                 .environment(documents)
                 .environment(appState)
@@ -79,7 +83,7 @@ struct QualverumApp: App {
     }
 
     #if DEBUG
-        private let useDebugRoot = true
+        private let useDebugRoot = false
     #endif
 
     @ViewBuilder
