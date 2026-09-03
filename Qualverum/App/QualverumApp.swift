@@ -79,7 +79,7 @@ struct QualverumApp: App {
     }
 
     #if DEBUG
-        private let useDebugRoot = false
+        private let useDebugRoot = true
     #endif
 
     @ViewBuilder
