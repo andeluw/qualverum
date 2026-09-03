@@ -12,7 +12,8 @@
     struct DebugRootView: View {
         var body: some View {
             //            DocumentPipelineDebugView()
-            EmbeddingDebugView()
+            //            EmbeddingDebugView()
+            DenseRetrievalDebugView()
         }
     }
 
