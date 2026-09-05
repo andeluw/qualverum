@@ -8,6 +8,7 @@
 import Foundation
 import Observation
 import RAGCore
+import RAGVectura
 
 struct RAGConversationTurn:
     Sendable
@@ -70,10 +71,7 @@ final class RAGService {
 
     private let chunkingStrategy: any ChunkingStrategy
 
-    // tenderID -> documentID -> entries
-    private var entriesByTender: [UUID: [UUID: [DenseIndexEntry]]] = [:]
-
-    private var retrieversByTender: [UUID: any DenseRetriever] = [:]
+    private var vectorIndex: (any RAGVectorIndex)?
 
     private static let insufficientMarker =
         "INSUFFICIENT_EVIDENCE"
@@ -113,61 +111,35 @@ final class RAGService {
         documentID: UUID,
         url: URL
     ) async throws -> RAGIndexedDocumentSummary {
-        let hasAccess = url.startAccessingSecurityScopedResource()
-
-        defer {
-            if hasAccess {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        let provider = try await loadEmbeddingProvider()
-
-        let document = try await documentParser.parse(url: url)
-
-        let chunks = chunkingStrategy.chunk(document)
-
-        let children = chunks.filter { chunk in
-            switch chunk.kind {
-            case .child:
-                return true
-
-            case .parent:
-                return false
-            }
-        }
-
-        let builder = DenseIndexBuilder(
-            embeddingProvider: provider
+        let parsedDocument = try await documentParser.parse(
+            url: url
         )
 
-        let entries = try await builder.build(from: children)
+        let document = ParsedDocument(
+            id: documentID.uuidString,
+            title: parsedDocument.title,
+            pages: parsedDocument.pages
+        )
 
-        var documents = entriesByTender[tenderID] ?? [:]
+        let chunks = chunkingStrategy.chunk(
+            document
+        )
 
-        // Re-indexing the same TenderDocument
-        // replaces its old entries.
-        documents[documentID] =
-            entries
+        let childCount = chunks.filter {
+            $0.kind == .child
+        }.count
 
-        entriesByTender[tenderID] =
-            documents
+        let index = try await loadVectorIndex()
 
-        let allEntries =
-            documents.values.flatMap {
-                $0
-            }
-
-        retrieversByTender[tenderID] =
-            try ExactDenseRetriever(
-                entries: allEntries
-            )
+        try await index.replaceDocument(
+            namespaceID: tenderID.uuidString,
+            documentID: documentID.uuidString,
+            chunks: chunks
+        )
 
         return RAGIndexedDocumentSummary(
-            pageCount:
-                document.pages.count,
-            childChunkCount:
-                entries.count
+            pageCount: document.pages.count,
+            childChunkCount: childCount
         )
     }
 
@@ -178,7 +150,13 @@ final class RAGService {
         history: [RAGConversationTurn] = [],
         topK: Int = 5
     ) async throws -> RAGAnswer {
-        guard let retriever = retrieversByTender[tenderID] else {
+        let index = try await loadVectorIndex()
+
+        let hasDocuments = try await index.hasDocuments(
+            namespaceID: tenderID.uuidString
+        )
+
+        guard hasDocuments else {
             throw RAGServiceError.noIndexForTender
         }
 
@@ -188,7 +166,8 @@ final class RAGService {
 
         let queryVector = try EmbeddingVector(values: values)
 
-        let results = try await retriever.retrieve(
+        let results = try await index.retrieve(
+            namespaceID: tenderID.uuidString,
             query: queryVector,
             topK: topK
         )
@@ -365,5 +344,22 @@ final class RAGService {
         embeddingProvider = provider
 
         return provider
+    }
+
+    private func loadVectorIndex() async throws -> any RAGVectorIndex {
+        if let vectorIndex {
+            return vectorIndex
+        }
+
+        let provider = try await loadEmbeddingProvider()
+
+        let index = VecturaRAGIndex(
+            rootDirectory: AppDirectories.rag,
+            embeddingProvider: provider
+        )
+
+        vectorIndex = index
+
+        return index
     }
 }

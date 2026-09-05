@@ -58,6 +58,7 @@ struct TenderDocument: Identifiable, Codable, Hashable {
     var imported: Date
     var state: DocumentState
     var sampleResource: String?   // name of a sample PDF, if we have one
+    var storedFilename: String? = nil
 }
 
 struct Tender: Identifiable, Codable, Hashable {

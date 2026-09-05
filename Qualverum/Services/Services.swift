@@ -11,17 +11,32 @@ import RAGCore
 
 // Fake data kept in memory.
 @Observable final class WorkspaceStore {
-    var tenders: [Tender]
+    var tenders: [Tender] {
+        didSet {
+            saveTenders()
+        }
+    }
     var evidence: [Evidence]
     var runs: [AnalysisRun]
     var threads: [ChatThread]
 
-    init() {
-        let t = MockQualverumData.makeTenders()
-        tenders = t
-        evidence = MockQualverumData.sharedEvidence
-        runs = MockQualverumData.makeRuns(tenders: t)
-        threads = MockQualverumData.makeThreads(tenders: t, evidence: MockQualverumData.sharedEvidence)
+    private let persistence: WorkspacePersistence
+
+    init(
+        persistence: WorkspacePersistence = WorkspacePersistence()
+    ) {
+        self.persistence = persistence
+
+        do {
+            tenders = try persistence.loadTenders()
+        } catch {
+            print("Failed to load workspace:", error)
+            tenders = []
+        }
+
+        evidence = []
+        runs = []
+        threads = []
     }
 
     func tender(_ id: UUID?) -> Tender? {
@@ -32,6 +47,14 @@ import RAGCore
     func evidence(_ id: UUID?) -> Evidence? {
         guard let id else { return nil }
         return evidence.first { $0.id == id }
+    }
+
+    private func saveTenders() {
+        do {
+            try persistence.saveTenders(tenders)
+        } catch {
+            print("Failed to save workspace:", error)
+        }
     }
 }
 
@@ -50,7 +73,9 @@ import RAGCore
     }
 
     func restore(_ id: UUID) {
-        update(id) { $0.status = $0.requirements.isEmpty ? .notAnalyzed : .inReview }
+        update(id) {
+            $0.status = $0.requirements.isEmpty ? .notAnalyzed : .inReview
+        }
     }
 
     func delete(_ id: UUID) {
@@ -58,7 +83,9 @@ import RAGCore
     }
 
     func update(_ id: UUID, _ mutate: (inout Tender) -> Void) {
-        guard let i = store.tenders.firstIndex(where: { $0.id == id }) else { return }
+        guard let i = store.tenders.firstIndex(where: { $0.id == id }) else {
+            return
+        }
         mutate(&store.tenders[i])
         store.tenders[i].modified = .now
     }
@@ -75,7 +102,9 @@ import RAGCore
 
     func usedBy(_ evidence: Evidence) -> [Tender] {
         store.tenders.filter { t in
-            t.requirements.contains { $0.assessment.evidenceIDs.contains(evidence.id) }
+            t.requirements.contains {
+                $0.assessment.evidenceIDs.contains(evidence.id)
+            }
         }
     }
 }
@@ -99,7 +128,9 @@ import RAGCore
     private var task: Task<Void, Never>?
 
     // Starts from the saved setting, then Settings updates it live.
-    var mockDelay: Double = (UserDefaults.standard.object(forKey: "mockAnalysisDelay") as? Double) ?? 0.35
+    var mockDelay: Double =
+        (UserDefaults.standard.object(forKey: "mockAnalysisDelay") as? Double)
+        ?? 0.35
 
     var runs: [AnalysisRun] { store.runs }
 
@@ -110,9 +141,14 @@ import RAGCore
 
     func analyze(_ tender: Tender) {
         guard status != .running else { return }
-        let stageLabels = ["Reading documents", "Extracting requirements",
-                           "Matching evidence", "Validating requirements", "Building assessments"]
-        stages = stageLabels.enumerated().map { Stage(label: $1, done: false, active: $0 == 0) }
+        let stageLabels = [
+            "Reading documents", "Extracting requirements",
+            "Matching evidence", "Validating requirements",
+            "Building assessments",
+        ]
+        stages = stageLabels.enumerated().map {
+            Stage(label: $1, done: false, active: $0 == 0)
+        }
         total = max(tender.requirementCount, stageLabels.count)
         processed = 0
         status = .running
@@ -148,21 +184,35 @@ import RAGCore
         // A freshly created tender has no requirements yet; the mock pipeline fills in a
         // realistic extracted set so the New Tender flow actually lands on a matrix.
         if resolved.requirements.isEmpty {
-            resolved.requirements = MockQualverumData.primaryRequirements(evidence: store.evidence)
+            resolved.requirements = MockQualverumData.primaryRequirements(
+                evidence: store.evidence
+            )
         }
         if let i = store.tenders.firstIndex(where: { $0.id == resolved.id }) {
             store.tenders[i].requirements = resolved.requirements
             store.tenders[i].status = .inReview
             store.tenders[i].modified = .now
         }
-        let result = (resolved.supportedCount, resolved.needsReviewCount, resolved.missingCount)
+        let result = (
+            resolved.supportedCount, resolved.needsReviewCount,
+            resolved.missingCount
+        )
         lastResult = result
         let run = AnalysisRun(
-            date: .now, tenderID: resolved.id, tenderName: resolved.name,
+            date: .now,
+            tenderID: resolved.id,
+            tenderName: resolved.name,
             tenderVersion: resolved.currentVersion,
-            evidenceVersion: ISO8601DateFormatter().string(from: .now).prefix(10).description,
-            configuration: .init(), supported: result.0, review: result.1, missing: result.2,
-            duration: Double(total) * mockDelay, status: .completed)
+            evidenceVersion: ISO8601DateFormatter().string(from: .now).prefix(
+                10
+            ).description,
+            configuration: .init(),
+            supported: result.0,
+            review: result.1,
+            missing: result.2,
+            duration: Double(total) * mockDelay,
+            status: .completed
+        )
         store.runs.insert(run, at: 0)
     }
 
@@ -266,7 +316,8 @@ final class ChatService {
                 append(
                     ChatMessage(
                         role: .assistant,
-                        text: "This scope is not indexed yet. Use Current Tender for document-grounded questions in this build."
+                        text:
+                            "This scope is not indexed yet. Use Current Tender for document-grounded questions in this build."
                     ),
                     to: threadID
                 )
@@ -278,7 +329,8 @@ final class ChatService {
                 append(
                     ChatMessage(
                         role: .assistant,
-                        text: "Select a tender before asking a document-grounded question.",
+                        text:
+                            "Select a tender before asking a document-grounded question.",
                         kind: .insufficientEvidence
                     ),
                     to: threadID
@@ -298,7 +350,8 @@ final class ChatService {
                     append(
                         ChatMessage(
                             role: .assistant,
-                            text: "I can't establish this from the indexed tender documents.",
+                            text:
+                                "I can't establish this from the indexed tender documents.",
                             kind: .insufficientEvidence
                         ),
                         to: threadID
@@ -311,7 +364,10 @@ final class ChatService {
                     ChatMessage(
                         role: .assistant,
                         text: answer.text,
-                        citations: Self.citations(from: answer.evidence)
+                        citations: citations(
+                            from: answer.evidence,
+                            tenderID: tenderID
+                        )
                     ),
                     to: threadID
                 )
@@ -329,7 +385,8 @@ final class ChatService {
                 append(
                     ChatMessage(
                         role: .assistant,
-                        text: "The retrieved context is too large for the on-device model. Try a more specific question."
+                        text:
+                            "The retrieved context is too large for the on-device model. Try a more specific question."
                     ),
                     to: threadID
                 )
@@ -338,7 +395,8 @@ final class ChatService {
                 append(
                     ChatMessage(
                         role: .assistant,
-                        text: "This tender has no indexed documents yet. Add a PDF in Tender Documents first.",
+                        text:
+                            "This tender has no indexed documents yet. Add a PDF in Tender Documents first.",
                         kind: .insufficientEvidence
                     ),
                     to: threadID
@@ -348,7 +406,8 @@ final class ChatService {
                 append(
                     ChatMessage(
                         role: .assistant,
-                        text: "I couldn't find relevant evidence in the indexed tender documents.",
+                        text:
+                            "I couldn't find relevant evidence in the indexed tender documents.",
                         kind: .insufficientEvidence
                     ),
                     to: threadID
@@ -358,7 +417,8 @@ final class ChatService {
                 append(
                     ChatMessage(
                         role: .assistant,
-                        text: "I couldn't answer this question.\n\n\(error.localizedDescription)"
+                        text:
+                            "I couldn't answer this question.\n\n\(error.localizedDescription)"
                     ),
                     to: threadID
                 )
@@ -375,16 +435,39 @@ final class ChatService {
         store.threads.firstIndex { $0.id == id }
     }
 
-    private static func citations(
-        from results: [RetrievalResult]
+    private func citations(
+        from results: [RetrievalResult],
+        tenderID: UUID
     ) -> [ChatCitation] {
-        results.enumerated().map { index, result in
+        results.enumerated().map {
+            index,
+            result in
+
             let chunk = result.chunk
+
+            let documentID = UUID(
+                uuidString: chunk.documentID
+            )
+
+            let document =
+                store.tender(tenderID)?
+                .documents
+                .first {
+                    $0.id == documentID
+                }
+
+            let name =
+                document?.name
+                ?? chunk.documentID
 
             return ChatCitation(
                 index: index + 1,
-                label: "\(chunk.documentID) · p.\(chunk.pageNumber)",
+                label:
+                    "\(name) · p.\(chunk.pageNumber)",
                 evidenceID: nil,
+                documentID: documentID,
+                storedFilename:
+                    document?.storedFilename,
                 page: chunk.pageNumber
             )
         }
@@ -395,13 +478,15 @@ final class ChatService {
     ) -> String {
         switch reason {
         case .appleIntelligenceNotEnabled:
-            return "Ask Qualverum requires Apple Intelligence. Turn on Apple Intelligence and try again."
+            return
+                "Ask Qualverum requires Apple Intelligence. Turn on Apple Intelligence and try again."
 
         case .deviceNotEligible:
             return "The on-device Foundation Model isn't supported on this Mac."
 
         case .modelNotReady:
-            return "The on-device Foundation Model isn't ready yet. It may still be downloading."
+            return
+                "The on-device Foundation Model isn't ready yet. It may still be downloading."
 
         case .unknown:
             return "The on-device Foundation Model is currently unavailable."
@@ -409,10 +494,56 @@ final class ChatService {
     }
 }
 
-@Observable final class DocumentService {
-    func sampleURL(named resource: String?) -> URL? {
-        guard let resource else { return nil }
-        let base = (resource as NSString).deletingPathExtension
-        return Bundle.main.url(forResource: base, withExtension: "pdf")
+@Observable
+final class DocumentService {
+    private let fileStore: DocumentFileStore
+
+    init(
+        fileStore: DocumentFileStore = DocumentFileStore()
+    ) {
+        self.fileStore = fileStore
+    }
+
+    func url(
+        for request: PDFRequest?
+    ) -> URL? {
+        guard let request else {
+            return nil
+        }
+
+        if let storedFilename =
+            request.storedFilename
+        {
+            let url = fileStore.url(
+                for: storedFilename
+            )
+
+            if FileManager.default.fileExists(
+                atPath: url.path
+            ) {
+                return url
+            }
+        }
+
+        return sampleURL(
+            named: request.resource
+        )
+    }
+
+    private func sampleURL(
+        named resource: String?
+    ) -> URL? {
+        guard let resource else {
+            return nil
+        }
+
+        let base =
+            (resource as NSString)
+            .deletingPathExtension
+
+        return Bundle.main.url(
+            forResource: base,
+            withExtension: "pdf"
+        )
     }
 }

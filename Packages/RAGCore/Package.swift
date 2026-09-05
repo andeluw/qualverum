@@ -14,13 +14,21 @@ let package = Package(
         .library(
             name: "RAGCore",
             targets: ["RAGCore"]
-        )
+        ),
+        .library(
+            name: "RAGVectura",
+            targets: ["RAGVectura"]
+        ),
     ],
     dependencies: [
         .package(
             url: "https://github.com/john-rocky/CoreML-LLM.git",
             from: "1.9.0"
-        )
+        ),
+        .package(
+            url: "https://github.com/rryam/VecturaKit.git",
+            from: "6.3.0"
+        ),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -34,9 +42,26 @@ let package = Package(
                 )
             ]
         ),
+        .target(
+            name: "RAGVectura",
+            dependencies: [
+                "RAGCore",
+                .product(
+                    name: "VecturaKit",
+                    package: "VecturaKit"
+                ),
+            ]
+        ),
         .testTarget(
             name: "RAGCoreTests",
             dependencies: ["RAGCore"]
+        ),
+        .testTarget(
+            name: "RAGVecturaTests",
+            dependencies: [
+                "RAGCore",
+                "RAGVectura",
+            ]
         ),
     ],
     swiftLanguageModes: [.v6]

@@ -19,6 +19,8 @@ struct TenderDocumentsView: View {
     @State private var importing = false
     @State private var indexing = false
 
+    private let fileStore = DocumentFileStore()
+
     private var tender: Tender? {
         workspace.store.tender(app.activeTenderID)
     }
@@ -115,7 +117,8 @@ struct TenderDocumentsView: View {
     private func open(_ document: TenderDocument) {
         app.pendingDocument = PDFRequest(
             title: document.name,
-            resource: document.sampleResource ?? document.name,
+            resource: document.sampleResource,
+            storedFilename: document.storedFilename,
             page: 1
         )
     }
@@ -123,23 +126,60 @@ struct TenderDocumentsView: View {
     private func addDocuments(_ urls: [URL]) {
         guard let tenderID = tender?.id, !urls.isEmpty else { return }
 
-        let imports = urls.map { url in
-            let document = TenderDocument(
-                id: UUID(),
-                name: url.lastPathComponent,
-                type: "Specification",
-                pages: 0,
-                version: "1.0",
-                imported: .now,
-                state: .imported,
-                sampleResource: nil
-            )
+        var imports:
+            [(
+                document: TenderDocument,
+                url: URL
+            )] = []
 
-            return (document, url)
+        for sourceURL in urls {
+            let documentID = UUID()
+
+            do {
+                let storedFilename =
+                    try fileStore.importPDF(
+                        from: sourceURL,
+                        documentID: documentID
+                    )
+
+                let document = TenderDocument(
+                    id: documentID,
+                    name: sourceURL.lastPathComponent,
+                    type: "Specification",
+                    pages: 0,
+                    version: "1.0",
+                    imported: .now,
+                    state: .imported,
+                    sampleResource: nil,
+                    storedFilename: storedFilename
+                )
+
+                let storedURL = fileStore.url(
+                    for: storedFilename
+                )
+
+                imports.append(
+                    (
+                        document: document,
+                        url: storedURL
+                    )
+                )
+
+            } catch {
+                print(
+                    "Failed to import \(sourceURL.lastPathComponent): \(error)"
+                )
+            }
+        }
+
+        guard !imports.isEmpty else {
+            return
         }
 
         workspace.update(tenderID) { tender in
-            tender.documents.append(contentsOf: imports.map { $0.0 })
+            tender.documents.append(
+                contentsOf: imports.map(\.document)
+            )
 
             if tender.status == .draft {
                 tender.status = .imported

@@ -96,5 +96,6 @@ struct PDFRequest: Identifiable, Hashable, Codable {
     var id = UUID()
     var title: String
     var resource: String?
+    var storedFilename: String? = nil
     var page: Int
 }

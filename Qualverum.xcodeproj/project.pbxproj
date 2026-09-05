@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		E75F73C03047BC3600855EF3 /* RAGCore in Frameworks */ = {isa = PBXBuildFile; productRef = E75F73BF3047BC3600855EF3 /* RAGCore */; };
+		E75F753B304C449D00855EF3 /* RAGVectura in Frameworks */ = {isa = PBXBuildFile; productRef = E75F753A304C449D00855EF3 /* RAGVectura */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E75F753B304C449D00855EF3 /* RAGVectura in Frameworks */,
 				E75F73C03047BC3600855EF3 /* RAGCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -81,6 +83,7 @@
 			name = Qualverum;
 			packageProductDependencies = (
 				E75F73BF3047BC3600855EF3 /* RAGCore */,
+				E75F753A304C449D00855EF3 /* RAGVectura */,
 			);
 			productName = Qualverum;
 			productReference = E75F73483047921800855EF3 /* Qualverum.app */;
@@ -368,6 +371,10 @@
 		E75F73BF3047BC3600855EF3 /* RAGCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = RAGCore;
+		};
+		E75F753A304C449D00855EF3 /* RAGVectura */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RAGVectura;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

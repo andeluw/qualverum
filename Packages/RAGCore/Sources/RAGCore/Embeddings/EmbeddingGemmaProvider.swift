@@ -18,6 +18,7 @@ public enum EmbeddingModelLoadState: Sendable {
 
 public actor EmbeddingGemmaProvider: EmbeddingProvider {
     private let model: EmbeddingGemma
+    public nonisolated let dimension = 768
 
     public init(
         onLoadState: (@Sendable (EmbeddingModelLoadState) -> Void)? = nil
@@ -88,7 +89,7 @@ public actor EmbeddingGemmaProvider: EmbeddingProvider {
         try model.encode(
             text: text,
             task: .retrievalQuery,
-            dim: 768
+            dim: dimension
         )
     }
 
@@ -98,7 +99,7 @@ public actor EmbeddingGemmaProvider: EmbeddingProvider {
         try model.encode(
             text: text,
             task: .retrievalDocument,
-            dim: 768
+            dim: dimension
         )
     }
 }

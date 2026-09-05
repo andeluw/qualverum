@@ -6,6 +6,8 @@
 //
 
 public protocol EmbeddingProvider: Sendable {
+    var dimension: Int { get }
+    
     func embedQuery(
         _ text: String
     ) async throws -> [Float]
