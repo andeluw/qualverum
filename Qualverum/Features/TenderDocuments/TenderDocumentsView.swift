@@ -18,6 +18,13 @@ struct TenderDocumentsView: View {
     ]
     @State private var importing = false
     @State private var indexing = false
+    @State private var deleting = false
+    @State private var pendingDeletion: TenderDocument?
+
+    private let documentImporter = DocumentImportService()
+    private let fileStore = DocumentFileStore()
+
+    private var isBusy: Bool { indexing || deleting }
 
     private var tender: Tender? {
         workspace.store.tender(app.activeTenderID)
@@ -72,6 +79,11 @@ struct TenderDocumentsView: View {
                         let document = rows.first(where: { $0.id == id })
                     {
                         Button("Open") { open(document) }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            pendingDeletion = document
+                        }
+                        .disabled(isBusy)
                     }
                 } primaryAction: { ids in
                     if let id = ids.first,
@@ -86,7 +98,7 @@ struct TenderDocumentsView: View {
         .toolbar {
             if tender != nil {
                 ToolbarItem {
-                    if indexing {
+                    if isBusy {
                         ProgressView().controlSize(.small)
                     }
                 }
@@ -97,7 +109,7 @@ struct TenderDocumentsView: View {
                     } label: {
                         Label("Add Documents", systemImage: "plus")
                     }
-                    .disabled(indexing)
+                    .disabled(isBusy)
                 }
             }
         }
@@ -110,82 +122,87 @@ struct TenderDocumentsView: View {
                 addDocuments(urls)
             }
         }
+        .confirmationDialog(
+            "Delete this document?",
+            isPresented: Binding(
+                get: { pendingDeletion != nil },
+                set: { if !$0 { pendingDeletion = nil } }
+            ),
+            presenting: pendingDeletion
+        ) { document in
+            Button("Delete", role: .destructive) { delete(document) }
+            Button("Cancel", role: .cancel) { pendingDeletion = nil }
+        } message: { document in
+            Text("\(document.name) will be removed from this tender. This cannot be undone.")
+        }
     }
 
     private func open(_ document: TenderDocument) {
         app.pendingDocument = PDFRequest(
             title: document.name,
-            resource: document.sampleResource ?? document.name,
+            resource: document.sampleResource,
+            storedFilename: document.storedFilename,
             page: 1
         )
     }
 
-    private func addDocuments(_ urls: [URL]) {
-        guard let tenderID = tender?.id, !urls.isEmpty else { return }
+    // Clear the document's vectors and stored PDF before dropping its metadata.
+    // Best-effort: stale documents from before persistence have no stored file
+    // or index entry, so those steps simply do nothing.
+    private func delete(_ document: TenderDocument) {
+        guard let tenderID = tender?.id else { return }
 
-        let imports = urls.map { url in
-            let document = TenderDocument(
-                id: UUID(),
-                name: url.lastPathComponent,
-                type: "Specification",
-                pages: 0,
-                version: "1.0",
-                imported: .now,
-                state: .imported,
-                sampleResource: nil
-            )
+        pendingDeletion = nil
+        deleting = true
 
-            return (document, url)
-        }
+        Task { @MainActor in
+            defer { deleting = false }
 
-        workspace.update(tenderID) { tender in
-            tender.documents.append(contentsOf: imports.map { $0.0 })
-
-            if tender.status == .draft {
-                tender.status = .imported
+            do {
+                try await rag.removeDocument(
+                    tenderID: tenderID,
+                    documentID: document.id
+                )
+            } catch {
+                print("Failed to remove \(document.name) from index:\n\(error)")
             }
+
+            if let stored = document.storedFilename {
+                do {
+                    try fileStore.delete(storedFilename: stored)
+                } catch {
+                    print("Failed to delete file for \(document.name):\n\(error)")
+                }
+            }
+
+            if app.selectedDocumentID == document.id {
+                app.selectedDocumentID = nil
+            }
+
+            workspace.update(tenderID) { tender in
+                tender.documents.removeAll { $0.id == document.id }
+            }
+        }
+    }
+
+    private func addDocuments(_ urls: [URL]) {
+        guard let tenderID = tender?.id, !urls.isEmpty else {
+            return
         }
 
         indexing = true
 
         Task { @MainActor in
-            defer { indexing = false }
-
-            // Sequential on purpose: one model instance and
-            // predictable indexing pressure.
-            for (document, url) in imports {
-                do {
-                    let summary = try await rag.indexDocument(
-                        tenderID: tenderID,
-                        documentID: document.id,
-                        url: url
-                    )
-
-                    workspace.update(tenderID) { tender in
-                        guard
-                            let index = tender.documents.firstIndex(
-                                where: { $0.id == document.id }
-                            )
-                        else { return }
-
-                        tender.documents[index].pages = summary.pageCount
-                        tender.documents[index].state = .indexed
-                    }
-
-                } catch {
-                    workspace.update(tenderID) { tender in
-                        guard
-                            let index = tender.documents.firstIndex(
-                                where: { $0.id == document.id }
-                            )
-                        else { return }
-
-                        tender.documents[index].state = .unavailable
-                    }
-
-                    print("Failed to index \(document.name):\n\(error)")
-                }
+            defer {
+                indexing = false
             }
+
+            await documentImporter.importAndIndex(
+                urls: urls,
+                tenderID: tenderID,
+                workspace: workspace,
+                rag: rag
+            )
         }
     }
 }

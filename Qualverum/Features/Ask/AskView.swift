@@ -33,9 +33,13 @@ struct AskView: View {
             .onChange(of: scope) { _, newScope in
                 if let thread { chat.setScope(newScope, for: thread.id) }
             }
-            .alert("Rename Chat", isPresented: .init(
-                get: { renaming != nil }, set: { if !$0 { renaming = nil } }
-            )) {
+            .alert(
+                "Rename Chat",
+                isPresented: .init(
+                    get: { renaming != nil },
+                    set: { if !$0 { renaming = nil } }
+                )
+            ) {
                 TextField("Title", text: $renameText)
                 Button("Rename") {
                     if let t = renaming { chat.rename(t.id, to: renameText) }
@@ -49,10 +53,16 @@ struct AskView: View {
     private var historyMenu: some ToolbarContent {
         ToolbarItem {
             Menu {
-                Button { newChat() } label: { Label("New Chat", systemImage: "square.and.pencil") }
+                Button {
+                    newChat()
+                } label: {
+                    Label("New Chat", systemImage: "square.and.pencil")
+                }
                 if let thread {
                     Button("Rename…") { rename(thread) }
-                    Button("Delete", role: .destructive) { chat.delete(thread.id) }
+                    Button("Delete", role: .destructive) {
+                        chat.delete(thread.id)
+                    }
                 }
                 if !chat.threads.isEmpty {
                     Divider()
@@ -62,7 +72,11 @@ struct AskView: View {
                                 app.selectThread(t)
                                 scope = t.scope
                             } label: {
-                                Label(t.title, systemImage: t.id == thread?.id ? "checkmark" : t.scope.symbol)
+                                Label(
+                                    t.title,
+                                    systemImage: t.id == thread?.id
+                                        ? "checkmark" : t.scope.symbol
+                                )
                             }
                         }
                     }
@@ -95,9 +109,14 @@ struct AskView: View {
             }
         } else {
             ContentUnavailableView {
-                Label("Ask Qualverum", systemImage: "bubble.left.and.text.bubble.right")
+                Label(
+                    "Ask Qualverum",
+                    systemImage: "bubble.left.and.text.bubble.right"
+                )
             } description: {
-                Text("Ask grounded questions about requirements, evidence, and readiness.")
+                Text(
+                    "Ask grounded questions about requirements, evidence, and readiness."
+                )
             } actions: {
                 Button("New Chat") { newChat() }
             }
@@ -107,7 +126,9 @@ struct AskView: View {
     private var scopeBar: some View {
         HStack {
             Picker("Scope", selection: $scope) {
-                ForEach(ChatScope.allCases) { Label($0.rawValue, systemImage: $0.symbol).tag($0) }
+                ForEach(ChatScope.allCases) {
+                    Label($0.rawValue, systemImage: $0.symbol).tag($0)
+                }
             }
             .pickerStyle(.menu)
             .fixedSize()
@@ -129,8 +150,13 @@ struct AskView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Suggested questions").font(.headline).padding(.bottom, 4)
                 ForEach(Self.suggested, id: \.self) { q in
-                    Button { draft = q } label: {
-                        Label(q, systemImage: "text.bubble").frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        draft = q
+                    } label: {
+                        Label(q, systemImage: "text.bubble").frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
                     }
                     .buttonStyle(.bordered)
                 }
@@ -158,15 +184,24 @@ struct AskView: View {
     }
 
     private var composer: some View {
-        ChatInputField(text: $draft, height: $inputHeight,
-                       placeholder: "Ask a question…", onSend: sendDraft)
-            .frame(height: inputHeight)
-            .padding(.trailing, 34)   // leave room for the send button
-            .padding(.horizontal, 4).padding(.vertical, 2)
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
-            .overlay(alignment: .bottomTrailing) {
-            Button { sendDraft() } label: {
+        ChatInputField(
+            text: $draft,
+            height: $inputHeight,
+            placeholder: "Ask a question…",
+            onSend: sendDraft
+        )
+        .frame(height: inputHeight)
+        .padding(.trailing, 34)  // leave room for the send button
+        .padding(.horizontal, 4).padding(.vertical, 2)
+        .background(
+            .background.secondary,
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
+        .overlay(alignment: .bottomTrailing) {
+            Button {
+                sendDraft()
+            } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white)
@@ -177,11 +212,11 @@ struct AskView: View {
             .accessibilityLabel("Send")
             .disabled(!canSend)
             .padding(6)
-            }
-            .frame(maxWidth: contentMaxWidth)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+        }
+        .frame(maxWidth: contentMaxWidth)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     // MARK: actions
@@ -242,8 +277,11 @@ private struct MessageRow: View {
     private var bubble: some View {
         VStack(alignment: .leading, spacing: 8) {
             if message.kind == .insufficientEvidence {
-                Label("Insufficient evidence", systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.orange)
+                Label(
+                    "Insufficient evidence",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption).foregroundStyle(.orange)
             }
             Text(message.text)
                 .textSelection(.enabled)
@@ -252,9 +290,15 @@ private struct MessageRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(message.citations) { c in
                         Button {
-                            app.pendingDocument = PDFRequest(title: c.label, resource: c.fileName, page: c.page)
+                            app.pendingDocument = PDFRequest(
+                                title: c.label,
+                                resource: c.fileName,
+                                storedFilename: c.storedFilename,
+                                page: c.page
+                            )
                         } label: {
-                            Text("[\(c.index)] \(c.label)").font(.caption).monospaced()
+                            Text("[\(c.index)] \(c.label)").font(.caption)
+                                .monospaced()
                         }
                         .buttonStyle(.link)
                     }
@@ -262,9 +306,12 @@ private struct MessageRow: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
-        .background(isUser ? AnyShapeStyle(Color.accentColor.opacity(0.15))
-                           : AnyShapeStyle(.background.secondary),
-                    in: RoundedRectangle(cornerRadius: 14))
+        .background(
+            isUser
+                ? AnyShapeStyle(Color.accentColor.opacity(0.15))
+                : AnyShapeStyle(.background.secondary),
+            in: RoundedRectangle(cornerRadius: 14)
+        )
     }
 }
 
@@ -279,14 +326,22 @@ struct AskSourcesInspector: View {
 
     var body: some View {
         if citations.isEmpty {
-            ContentUnavailableView("No Sources", systemImage: "doc.text.magnifyingglass",
-                                   description: Text("Cited sources appear here."))
+            ContentUnavailableView(
+                "No Sources",
+                systemImage: "doc.text.magnifyingglass",
+                description: Text("Cited sources appear here.")
+            )
         } else {
             List {
                 Section("Sources") {
                     ForEach(citations) { c in
                         Button {
-                            app.pendingDocument = PDFRequest(title: c.label, resource: c.fileName, page: c.page)
+                            app.pendingDocument = PDFRequest(
+                                title: c.label,
+                                resource: c.fileName,
+                                storedFilename: c.storedFilename,
+                                page: c.page
+                            )
                         } label: {
                             Label("\(c.label)", systemImage: "doc.richtext")
                         }

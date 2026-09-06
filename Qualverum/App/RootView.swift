@@ -56,6 +56,7 @@ private struct DetailContainer: View {
             case .retrievalInspector: RetrievalInspectorView()
             case .chunkInspector: ChunkInspectorView()
             case .experimentInspector: ExperimentInspectorView()
+            case .ragBenchmark: RAGBenchmarkView()
             }
         }
         .inspector(isPresented: Binding(
@@ -102,7 +103,7 @@ private struct DetailContainer: View {
 
     private var hasInspector: Bool {
         switch app.sidebarSelection ?? .overview {
-        case .allTenders, .tenderDocuments, .retrievalInspector, .experimentInspector: false
+        case .allTenders, .tenderDocuments, .retrievalInspector, .experimentInspector, .ragBenchmark: false
         default: true
         }
     }

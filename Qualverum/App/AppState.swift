@@ -19,6 +19,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case retrievalInspector = "Retrieval Inspector"
     case chunkInspector = "Chunk Inspector"
     case experimentInspector = "Experiment Inspector"
+    case ragBenchmark = "RAG Benchmark"
 
     var id: String { rawValue }
 
@@ -34,12 +35,13 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .retrievalInspector: "magnifyingglass.circle"
         case .chunkInspector: "square.stack.3d.up"
         case .experimentInspector: "testtube.2"
+        case .ragBenchmark: "checkmark.seal"
         }
     }
 
     var isDeveloper: Bool {
         switch self {
-        case .retrievalInspector, .chunkInspector, .experimentInspector: true
+        case .retrievalInspector, .chunkInspector, .experimentInspector, .ragBenchmark: true
         default: false
         }
     }
@@ -96,5 +98,6 @@ struct PDFRequest: Identifiable, Hashable, Codable {
     var id = UUID()
     var title: String
     var resource: String?
+    var storedFilename: String? = nil
     var page: Int
 }

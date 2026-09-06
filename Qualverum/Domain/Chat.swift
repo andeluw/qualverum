@@ -31,6 +31,9 @@ struct ChatCitation: Identifiable, Codable, Hashable {
     var index: Int              // [1], [2] …
     var label: String           // "School-SIS-Case-Study.pdf · p.4"
     var evidenceID: UUID?
+    var documentID: UUID? = nil
+    var storedFilename: String? = nil
+    
     var page: Int
 
     // Grabs the file name from the label, the part before " · ".

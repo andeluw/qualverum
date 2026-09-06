@@ -76,9 +76,15 @@ public struct FoundationModelProvider:
             }
 
         do {
+            // Greedy sampling for repeatability: the same question and
+            // evidence give the same answer within one model version, which
+            // the benchmark and a compliance product both want.
             let response =
                 try await session.respond(
-                    to: Prompt(prompt)
+                    to: Prompt(prompt),
+                    options: GenerationOptions(
+                        sampling: .greedy
+                    )
                 )
 
             return response.content

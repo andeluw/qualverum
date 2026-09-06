@@ -11,6 +11,9 @@ struct AllTendersView: View {
     @Environment(AppState.self) private var app
     @Environment(WorkspaceService.self) private var workspace
     @Environment(AnalysisService.self) private var analysis
+    @Environment(RAGService.self) private var rag
+
+    private let fileStore = DocumentFileStore()
 
     @State private var sortOrder = [KeyPathComparator(\Tender.deadline)]
     @State private var selection: Tender.ID?
@@ -65,7 +68,7 @@ struct AllTendersView: View {
         .confirmationDialog("Delete this tender?", isPresented: .init(
             get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }
         ), presenting: pendingDeletion) { t in
-            Button("Delete", role: .destructive) { workspace.delete(t.id); pendingDeletion = nil }
+            Button("Delete", role: .destructive) { delete(t) }
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: { t in Text("\(t.name) and its requirements will be removed. This cannot be undone.") }
     }
@@ -106,5 +109,39 @@ struct AllTendersView: View {
     private func open(_ t: Tender) {
         app.selectTender(t.id)
         app.sidebarSelection = .overview
+    }
+
+    // Persistence lives in three places, so removing a tender means clearing
+    // its vectors and stored PDFs before dropping the metadata. Best-effort:
+    // a failed file or index removal still lets the tender itself go.
+    private func delete(_ tender: Tender) {
+        pendingDeletion = nil
+
+        Task { @MainActor in
+            for document in tender.documents {
+                do {
+                    try await rag.removeDocument(
+                        tenderID: tender.id,
+                        documentID: document.id
+                    )
+                } catch {
+                    print("Failed to remove \(document.name) from index:\n\(error)")
+                }
+
+                if let stored = document.storedFilename {
+                    do {
+                        try fileStore.delete(storedFilename: stored)
+                    } catch {
+                        print("Failed to delete file for \(document.name):\n\(error)")
+                    }
+                }
+            }
+
+            if app.activeTenderID == tender.id {
+                app.selectTender(nil)
+            }
+
+            workspace.delete(tender.id)
+        }
     }
 }

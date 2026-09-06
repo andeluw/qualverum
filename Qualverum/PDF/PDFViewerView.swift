@@ -5,14 +5,14 @@
 //  Created by Andrew Wallace on 02/09/26.
 //
 
-import SwiftUI
 import PDFKit
+import SwiftUI
 
 struct PDFViewerView: View {
     let request: PDFRequest?
     @Environment(DocumentService.self) private var documents
 
-    private var url: URL? { documents.sampleURL(named: request?.resource) }
+    private var url: URL? { documents.url(for: request) }
 
     var body: some View {
         Group {
@@ -21,10 +21,15 @@ struct PDFViewerView: View {
                     PDFKitView(url: url, page: request.page)
                 } else {
                     ContentUnavailableView {
-                        Label("Document Unavailable", systemImage: "doc.questionmark")
+                        Label(
+                            "Document Unavailable",
+                            systemImage: "doc.questionmark"
+                        )
                     } description: {
-                        Text("\(request.title)\n\nThe source file is not indexed in this mock workspace. In the shipping app this opens the original PDF at page \(request.page).")
-                            .multilineTextAlignment(.center)
+                        Text(
+                            "\(request.title)\n\nThe source file could not be found."
+                        )
+                        .multilineTextAlignment(.center)
                     }
                 }
             } else {
@@ -58,7 +63,8 @@ private struct PDFKitView: NSViewRepresentable {
     private func goToPage(_ view: PDFView) {
         // Citations start at page 1 but PDFKit starts at 0.
         if let doc = view.document, page > 0, page <= doc.pageCount,
-           let target = doc.page(at: page - 1) {
+            let target = doc.page(at: page - 1)
+        {
             view.go(to: target)
         }
     }
