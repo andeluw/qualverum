@@ -29,6 +29,7 @@ struct SidebarView: View {
             }
             if developerMode {
                 Section("Developer") {
+                    row(.ragBenchmark)
                     row(.retrievalInspector)
                     row(.chunkInspector)
                     row(.experimentInspector)
