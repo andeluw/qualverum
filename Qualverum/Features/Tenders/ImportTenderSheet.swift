@@ -13,6 +13,7 @@ struct ImportTenderSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var app
     @Environment(WorkspaceService.self) private var workspace
+    @Environment(RAGService.self) private var rag
 
     @State private var pickedFiles: [URL] = []
     @State private var name = ""
@@ -21,13 +22,17 @@ struct ImportTenderSheet: View {
     @State private var deadline = Date.now.addingTimeInterval(60 * 60 * 24 * 30)
     @State private var importing = false
 
+    private let documentImporter = DocumentImportService()
+
     var body: some View {
         VStack(spacing: 0) {
             if pickedFiles.isEmpty { chooseStep } else { reviewStep }
         }
         .frame(width: 500, height: 480)
         .fileImporter(isPresented: $importing, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result { adopt(urls) }
+            if case .success(let urls) = result {
+                adopt(urls)
+            }
         }
     }
 
@@ -47,9 +52,7 @@ struct ImportTenderSheet: View {
             Form {
                 Section("Documents") {
                     ForEach(pickedFiles, id: \.self) { url in
-                        LabeledContent(url.lastPathComponent) {
-                            Text("\(mockPages(url)) pages").foregroundStyle(.secondary)
-                        }
+                        Text(url.lastPathComponent)
                     }
                     Button("Add More…") { importing = true }
                 }
@@ -74,30 +77,52 @@ struct ImportTenderSheet: View {
         }
     }
 
-    private func mockPages(_ url: URL) -> Int { 8 + abs(url.lastPathComponent.hashValue % 80) }
-
     private func adopt(_ urls: [URL]) {
         pickedFiles.append(contentsOf: urls)
+
         if name.isEmpty, let first = pickedFiles.first {
-            name = (first.deletingPathExtension().lastPathComponent)
+            name = first.deletingPathExtension().lastPathComponent
                 .replacingOccurrences(of: "-", with: " ")
                 .replacingOccurrences(of: "_", with: " ")
         }
     }
 
     private func performImport() {
-        let docs = pickedFiles.map {
-            TenderDocument(name: $0.lastPathComponent, type: "Specification", pages: mockPages($0),
-                           version: "1.0", imported: .now, state: .imported, sampleResource: nil)
-        }
         let tender = Tender(
-            name: name, buyer: buyer, reference: reference, deadline: deadline,
-            status: .imported, created: .now, modified: .now,
-            versions: [.init(label: "1.0", date: .now, change: "Imported", documentCount: docs.count)],
-            documents: docs, requirements: [])
+            name: name,
+            buyer: buyer,
+            reference: reference,
+            deadline: deadline,
+            status: .draft,
+            created: .now,
+            modified: .now,
+            versions: [
+                .init(
+                    label: "1.0",
+                    date: .now,
+                    change: "Imported",
+                    documentCount: 0
+                )
+            ],
+            documents: [],
+            requirements: []
+        )
+
         workspace.addTender(tender)
         app.selectTender(tender.id)
         app.sidebarSelection = .overview
+
+        let urls = pickedFiles
+
+        Task {
+            await documentImporter.importAndIndex(
+                urls: urls,
+                tenderID: tender.id,
+                workspace: workspace,
+                rag: rag
+            )
+        }
+
         dismiss()
     }
 }

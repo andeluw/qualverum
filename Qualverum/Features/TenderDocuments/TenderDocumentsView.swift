@@ -19,7 +19,7 @@ struct TenderDocumentsView: View {
     @State private var importing = false
     @State private var indexing = false
 
-    private let fileStore = DocumentFileStore()
+    private let documentImporter = DocumentImportService()
 
     private var tender: Tender? {
         workspace.store.tender(app.activeTenderID)
@@ -124,108 +124,23 @@ struct TenderDocumentsView: View {
     }
 
     private func addDocuments(_ urls: [URL]) {
-        guard let tenderID = tender?.id, !urls.isEmpty else { return }
-
-        var imports:
-            [(
-                document: TenderDocument,
-                url: URL
-            )] = []
-
-        for sourceURL in urls {
-            let documentID = UUID()
-
-            do {
-                let storedFilename =
-                    try fileStore.importPDF(
-                        from: sourceURL,
-                        documentID: documentID
-                    )
-
-                let document = TenderDocument(
-                    id: documentID,
-                    name: sourceURL.lastPathComponent,
-                    type: "Specification",
-                    pages: 0,
-                    version: "1.0",
-                    imported: .now,
-                    state: .imported,
-                    sampleResource: nil,
-                    storedFilename: storedFilename
-                )
-
-                let storedURL = fileStore.url(
-                    for: storedFilename
-                )
-
-                imports.append(
-                    (
-                        document: document,
-                        url: storedURL
-                    )
-                )
-
-            } catch {
-                print(
-                    "Failed to import \(sourceURL.lastPathComponent): \(error)"
-                )
-            }
-        }
-
-        guard !imports.isEmpty else {
+        guard let tenderID = tender?.id, !urls.isEmpty else {
             return
-        }
-
-        workspace.update(tenderID) { tender in
-            tender.documents.append(
-                contentsOf: imports.map(\.document)
-            )
-
-            if tender.status == .draft {
-                tender.status = .imported
-            }
         }
 
         indexing = true
 
         Task { @MainActor in
-            defer { indexing = false }
-
-            // Sequential on purpose: one model instance and
-            // predictable indexing pressure.
-            for (document, url) in imports {
-                do {
-                    let summary = try await rag.indexDocument(
-                        tenderID: tenderID,
-                        documentID: document.id,
-                        url: url
-                    )
-
-                    workspace.update(tenderID) { tender in
-                        guard
-                            let index = tender.documents.firstIndex(
-                                where: { $0.id == document.id }
-                            )
-                        else { return }
-
-                        tender.documents[index].pages = summary.pageCount
-                        tender.documents[index].state = .indexed
-                    }
-
-                } catch {
-                    workspace.update(tenderID) { tender in
-                        guard
-                            let index = tender.documents.firstIndex(
-                                where: { $0.id == document.id }
-                            )
-                        else { return }
-
-                        tender.documents[index].state = .unavailable
-                    }
-
-                    print("Failed to index \(document.name):\n\(error)")
-                }
+            defer {
+                indexing = false
             }
+
+            await documentImporter.importAndIndex(
+                urls: urls,
+                tenderID: tenderID,
+                workspace: workspace,
+                rag: rag
+            )
         }
     }
 }

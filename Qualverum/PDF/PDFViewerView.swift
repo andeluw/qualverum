@@ -27,7 +27,7 @@ struct PDFViewerView: View {
                         )
                     } description: {
                         Text(
-                            "\(request.title)\n\nThe source file is not indexed in this mock workspace. In the shipping app this opens the original PDF at page \(request.page)."
+                            "\(request.title)\n\nThe source file could not be found."
                         )
                         .multilineTextAlignment(.center)
                     }
